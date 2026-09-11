@@ -8,14 +8,14 @@ module only decides which model each tier names.
 
 import os
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 DEFAULT_FAST = "claude-haiku-4-5"
 DEFAULT_DEEP = "claude-opus-5"
 DEFAULT_EMBED = "jina-embeddings-v4"
 
 
-class Tier(str, Enum):
+class Tier(StrEnum):
     FAST = "fast"
     DEEP = "deep"
 
