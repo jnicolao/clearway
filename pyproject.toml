@@ -4,10 +4,14 @@ version = "0.1.0"
 description = "Multimodal trade-document clearance copilot"
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=1.5.0",
     "httpx2>=2.12.0",
     "websockets>=13.0",
 ]
+
+# Heavy ML stack, needed only to actually index pages. Kept out of the
+# default install so CI stays a ~10s job:  uv sync --extra retrieval
+[project.optional-dependencies]
+retrieval = ["colpali-engine>=0.3", "torch>=2.4", "pillow>=10.0"]
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6"]

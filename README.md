@@ -71,26 +71,53 @@ Numbers land here when they are measured on a held-out set, and not before.
 
 ## Stack
 
-**No GPU anywhere.** Inference is hosted, so a clone runs on a laptop with two
-API keys — which is also what production looks like. Self-hosting a 7B model
-was never the interesting part of this project.
+**Fully open source, no paid APIs, no GPU required.** Every model runs
+locally and every weight is Apache-2.0. A clone needs Ollama and a laptop.
 
-**Models** — `jina-embeddings-v4` in multi-vector mode for page embeddings,
-which gives late interaction without self-hosting ColPali. `claude-haiku-4-5`
-for bulk extraction, escalating to `claude-opus-5` where confidence is low.
-Every call returns token usage, so cost per document is a measurement and not
-an estimate.
+**Models** — `ColQwen2` (Apache-2.0) for multi-vector page retrieval, giving
+late interaction locally. ColPali is deliberately *not* used: its PaliGemma
+backbone ships under the Gemma licence. `Qwen2.5-VL` via Ollama for
+extraction, small tier by default and the larger one where confidence is low.
 
 **Infrastructure** — Python · LangGraph · Qdrant (multi-vector) · Postgres +
-pgvector · Langfuse · Prefect · Docker Compose. All CPU-only.
+pgvector · Langfuse · Prefect · Docker Compose. Apache-2.0 or MIT throughout.
 
-**Live APIs** — OpenSanctions (denied-party screening), USITC HTS (tariff
-validation), UN Comtrade (trade flows), AISStream (vessel AIS).
+**Live APIs** — all free, no key or no card: OpenSanctions (denied-party
+screening), USITC HTS (tariff validation), UN Comtrade (trade flows),
+AISStream (vessel AIS).
+
+**Memory note.** ColQwen2-2B and Qwen2.5-VL-7B do not co-reside comfortably
+in 16GB, so indexing and extraction run as sequential batch phases rather
+than one live pipeline. That is a real constraint on the design, not a
+tuning detail.
+
+## Evaluation corpus
+
+No free, openly-licensed corpus of real scanned trade documents with
+extraction ground truth exists — those documents are commercially sensitive.
+So the corpus is assembled in three layers, and results are always reported
+against the real ones alongside the generated ones:
+
+- **Retrieval** on **ViDoRe**, so the headline number sits next to published
+  ColPali results rather than a private baseline of our own choosing.
+- **Extraction** on **CORD** (CC BY 4.0) and **DocLayNet**
+  (CDLA-Permissive-1.0). DocILE is excluded: research-access only, which a
+  fully-open project cannot redistribute.
+- **Reconciliation** on a generated bundle corpus, seeded from real public
+  data — HS codes from USITC HTS, vessels and ports from this repo's own AIS
+  collector, trade flows from UN Comtrade, entity names from OpenSanctions.
+  Cross-document reconciliation *cannot* be evaluated on a found corpus:
+  measuring whether an invoice disagrees with a declaration needs every
+  discrepancy labelled, which is only free if you inject them yourself.
+
+Generated corpora inflate scores when the generator and the extractor share
+assumptions. The mitigation is structural — a synthetic number is never
+published without the ViDoRe and CORD numbers beside it.
 
 ## Roadmap
 
 - [x] Port-call collector (AIS) — running, feeds dwell-time forecasting
-- [x] Model client layer — tiered VLM calls with usage accounting
+- [x] Model client layer — local Ollama tiers with throughput accounting
 - [ ] Ingestion pipeline and document corpus
 - [ ] Visual retrieval index, end to end
 - [ ] Eval harness v1 and the retrieval baseline comparison
