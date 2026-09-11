@@ -30,9 +30,9 @@ specific discrepancies, and a cropped image of the evidence behind each claim.
 Two decisions separate this from a document-parsing wrapper.
 
 **Documents are read as images, not as OCR text.** Retrieval uses
-late-interaction multi-vector matching over page images, so layout, stamps, and
-table structure survive into the model's context instead of being flattened
-into a text blob first.
+late-interaction multi-vector matching over page images — via a hosted
+embedding API — so layout, stamps, and table structure survive into the
+model's context instead of being flattened into a text blob first.
 
 **Every assertion is grounded in a pixel region.** Each extracted field carries
 a page and bounding box, and a second model re-verifies the claim against only
@@ -71,14 +71,26 @@ Numbers land here when they are measured on a held-out set, and not before.
 
 ## Stack
 
-Python · LangGraph · Qdrant (multi-vector) · Postgres + pgvector · vLLM ·
-Langfuse · Prefect · Docker Compose
+**No GPU anywhere.** Inference is hosted, so a clone runs on a laptop with two
+API keys — which is also what production looks like. Self-hosting a 7B model
+was never the interesting part of this project.
 
-Live APIs: OpenSanctions (denied-party screening), USITC HTS (tariff
+**Models** — `jina-embeddings-v4` in multi-vector mode for page embeddings,
+which gives late interaction without self-hosting ColPali. `claude-haiku-4-5`
+for bulk extraction, escalating to `claude-opus-5` where confidence is low.
+Every call returns token usage, so cost per document is a measurement and not
+an estimate.
+
+**Infrastructure** — Python · LangGraph · Qdrant (multi-vector) · Postgres +
+pgvector · Langfuse · Prefect · Docker Compose. All CPU-only.
+
+**Live APIs** — OpenSanctions (denied-party screening), USITC HTS (tariff
 validation), UN Comtrade (trade flows), AISStream (vessel AIS).
 
 ## Roadmap
 
+- [x] Port-call collector (AIS) — running, feeds dwell-time forecasting
+- [x] Model client layer — tiered VLM calls with usage accounting
 - [ ] Ingestion pipeline and document corpus
 - [ ] Visual retrieval index, end to end
 - [ ] Eval harness v1 and the retrieval baseline comparison

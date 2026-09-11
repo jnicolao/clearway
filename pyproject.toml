@@ -3,7 +3,11 @@ name = "clearway"
 version = "0.1.0"
 description = "Multimodal trade-document clearance copilot"
 requires-python = ">=3.12"
-dependencies = ["websockets>=13.0"]
+dependencies = [
+    "anthropic>=1.5.0",
+    "httpx2>=2.12.0",
+    "websockets>=13.0",
+]
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6"]
