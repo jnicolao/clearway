@@ -1,0 +1,12 @@
+[
+  {"code": "KEMBA", "name": "Mombasa", "country": "Kenya"},
+  {"code": "TZDAR", "name": "Dar es Salaam", "country": "Tanzania"},
+  {"code": "ZADUR", "name": "Durban", "country": "South Africa"},
+  {"code": "NLRTM", "name": "Rotterdam", "country": "Netherlands"},
+  {"code": "AEJEA", "name": "Jebel Ali", "country": "United Arab Emirates"},
+  {"code": "CNSHA", "name": "Shanghai", "country": "China"},
+  {"code": "INNSA", "name": "Nhava Sheva", "country": "India"},
+  {"code": "GBFXT", "name": "Felixstowe", "country": "United Kingdom"},
+  {"code": "DEHAM", "name": "Hamburg", "country": "Germany"},
+  {"code": "SGSIN", "name": "Singapore", "country": "Singapore"}
+]

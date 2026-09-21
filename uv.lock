@@ -188,13 +188,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx2" },
+    { name = "pillow" },
     { name = "websockets" },
 ]
 
 [package.optional-dependencies]
 retrieval = [
     { name = "colpali-engine" },
-    { name = "pillow" },
     { name = "torch" },
 ]
 
@@ -208,7 +208,7 @@ dev = [
 requires-dist = [
     { name = "colpali-engine", marker = "extra == 'retrieval'", specifier = ">=0.3" },
     { name = "httpx2", specifier = ">=2.12.0" },
-    { name = "pillow", marker = "extra == 'retrieval'", specifier = ">=10.0" },
+    { name = "pillow", specifier = ">=12.3.0" },
     { name = "torch", marker = "extra == 'retrieval'", specifier = ">=2.4" },
     { name = "websockets", specifier = ">=13.0" },
 ]
