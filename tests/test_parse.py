@@ -68,3 +68,28 @@ def test_tolerates_missing_message_body():
     bare = {k: v for k, v in envelope(*MOMBASA).items() if k != "Message"}
     report = parse_position_report(bare)
     assert report is not None and report.sog is None
+
+
+def test_parses_a_live_shaped_envelope():
+    """Shape observed from real AISStream traffic on 2026-09-21.
+
+    Durban, a berthed vessel reporting zero speed — which is the case that
+    matters, since dwell time is measured from stationary vessels.
+    """
+    envelope = {
+        "MessageType": "PositionReport",
+        "MetaData": {
+            "MMSI": 371987000,
+            "ShipName": "GARNET ACE",
+            "latitude": -29.8705,
+            "longitude": 31.0348,
+            "time_utc": "2026-09-21 11:05:54.186489655 +0000 UTC",
+        },
+        "Message": {"PositionReport": {"MessageID": 1, "Sog": 0.0, "Cog": 219.4}},
+    }
+    report = parse_position_report(envelope)
+    assert report is not None
+    assert report.ship_name == "GARNET ACE"
+    assert report.port.code == "ZADUR"
+    assert report.sog == 0.0
+    assert report.received_at.endswith("+0000 UTC"), "server time, not our fallback"

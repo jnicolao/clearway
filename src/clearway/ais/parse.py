@@ -5,9 +5,14 @@ testable against recorded fixtures, which is what makes CI on this package
 worth running.
 
 AISStream's documentation describes MetaData as free-form and is inconsistent
-about its casing (`Latitude` in one place, `latitude` in another). We read
-whichever is present rather than betting on one. Confirm against a real
-message once a key is in hand and simplify this if the docs settle.
+about its casing (`Latitude` in one place, `latitude` in another), so lookups
+are case-insensitive and stay that way.
+
+Confirmed against live traffic on 2026-09-21: `time_utc` is present and
+carries the server's own timestamp, so rows record when the server saw a
+vessel rather than when we happened to read the socket. Only genuinely
+distinct spellings are listed below now — `_first` already lowercases both
+sides, so passing "Latitude" and "latitude" was the same lookup twice.
 """
 
 from dataclasses import dataclass
@@ -62,8 +67,8 @@ def parse_position_report(envelope: dict[str, Any]) -> PositionReport | None:
     if not isinstance(meta, dict):
         return None
 
-    lat = _as_float(_first(meta, "Latitude", "latitude"))
-    lon = _as_float(_first(meta, "Longitude", "longitude"))
+    lat = _as_float(_first(meta, "latitude"))
+    lon = _as_float(_first(meta, "longitude"))
     if lat is None or lon is None:
         return None
     if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
@@ -73,7 +78,7 @@ def parse_position_report(envelope: dict[str, Any]) -> PositionReport | None:
     if port is None:
         return None
 
-    mmsi = _first(meta, "MMSI", "mmsi", "UserID")
+    mmsi = _first(meta, "mmsi", "UserID")
     if not isinstance(mmsi, int) or isinstance(mmsi, bool):
         return None
 
@@ -81,7 +86,7 @@ def parse_position_report(envelope: dict[str, Any]) -> PositionReport | None:
     report = body.get(POSITION_REPORT) if isinstance(body, dict) else None
     report = report if isinstance(report, dict) else {}
 
-    name = _first(meta, "ShipName", "shipname")
+    name = _first(meta, "shipname")
     name = name.strip() or None if isinstance(name, str) else None
 
     return PositionReport(
@@ -89,8 +94,8 @@ def parse_position_report(envelope: dict[str, Any]) -> PositionReport | None:
         ship_name=name,
         lat=lat,
         lon=lon,
-        sog=_as_float(_first(report, "Sog", "SOG")),
-        cog=_as_float(_first(report, "Cog", "COG")),
+        sog=_as_float(_first(report, "sog")),
+        cog=_as_float(_first(report, "cog")),
         port=port,
         received_at=_first(meta, "time_utc", "timeutc") or datetime.now(UTC).isoformat(),
     )
