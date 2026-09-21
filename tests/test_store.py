@@ -26,3 +26,17 @@ def test_round_trips_reports(tmp_path):
 def test_empty_insert_is_a_no_op(tmp_path):
     conn = connect(tmp_path / "ais.sqlite3")
     assert insert_many(conn, []) == 0
+
+
+def test_only_one_collector_can_hold_the_lock(tmp_path):
+    """Two collectors on one database would duplicate rows silently."""
+    from clearway.ais.collector import acquire_lock
+
+    db = tmp_path / "ais.sqlite3"
+    first = acquire_lock(str(db))
+    assert first is not None
+    assert acquire_lock(str(db)) is None, "second collector should be refused"
+    first.close()
+    second = acquire_lock(str(db))
+    assert second is not None, "lock should be free once the holder exits"
+    second.close()

@@ -10,9 +10,11 @@ that write happens first thing.
 """
 
 import asyncio
+import fcntl
 import json
 import logging
 import os
+import pathlib
 import signal
 import sqlite3
 from contextlib import suppress
@@ -105,6 +107,26 @@ async def run(api_key: str, db_path: str, stop: asyncio.Event) -> None:
         log.info("collector stopped")
 
 
+def acquire_lock(db_path: str):
+    """Exclusive lock beside the database, held for the process lifetime.
+
+    There are two ways to start this now — a terminal and a launchd agent —
+    so two collectors writing the same rows is a real hazard rather than a
+    theoretical one. The schema has no uniqueness constraint, so duplicates
+    would land silently and skew every dwell-time figure derived from them.
+    Returns None if another collector already holds the lock.
+    """
+    path = pathlib.Path(f"{db_path}.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("w")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
     api_key = os.environ.get("AISSTREAM_API_KEY", "").strip()
@@ -114,13 +136,24 @@ async def main() -> None:
             "and put it in .env (see .env.example)."
         )
 
+    db_path = os.environ.get("CLEARWAY_AIS_DB", "data/ais.sqlite3")
+    lock = acquire_lock(db_path)
+    if lock is None:
+        raise SystemExit(
+            f"another collector is already writing to {db_path}. "
+            "Running two would put duplicate rows in the dataset."
+        )
+
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         with suppress(NotImplementedError):
             loop.add_signal_handler(sig, stop.set)
 
-    await run(api_key, os.environ.get("CLEARWAY_AIS_DB", "data/ais.sqlite3"), stop)
+    try:
+        await run(api_key, db_path, stop)
+    finally:
+        lock.close()
 
 
 if __name__ == "__main__":
