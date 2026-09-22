@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from random import Random
 
+from clearway.corpus.containers import make as make_container
 from clearway.corpus.model import LineItem, Party, Port, Shipment
 
 SEEDS = pathlib.Path(__file__).parent / "seeds"
@@ -30,6 +31,7 @@ FALLBACK_VESSELS = (
 )
 INCOTERMS = ("FOB", "CIF", "CFR", "EXW", "DAP", "FCA")
 CURRENCIES = ("USD", "EUR", "GBP")
+FREIGHT_TERMS = ("FREIGHT PREPAID", "FREIGHT COLLECT")
 
 
 def _load(name: str):
@@ -101,10 +103,11 @@ def _party(rng: Random, parties: dict) -> Party:
     )
 
 
-def _line_item(rng: Random, hs: dict) -> LineItem:
+def _line_item(rng: Random, hs: dict, index: int) -> LineItem:
     quantity = rng.choice([12, 24, 48, 60, 100, 120, 240, 500, 1000, 1200])
     unit_price = Decimal(str(rng.randrange(150, 90_000) / 100)).quantize(Decimal("0.01"))
     per_unit_kg = Decimal(str(rng.randrange(20, 4_000) / 100))
+    cartons = max(1, quantity // rng.choice([6, 12, 24]))
     return LineItem(
         description=hs["description"],
         hts=hs["hts"],
@@ -112,7 +115,10 @@ def _line_item(rng: Random, hs: dict) -> LineItem:
         unit=hs["unit"],
         unit_price=unit_price,
         net_weight_kg=(per_unit_kg * quantity).quantize(Decimal("0.001")),
-        cartons=max(1, quantity // rng.choice([6, 12, 24])),
+        cartons=cartons,
+        tare_per_carton_kg=Decimal(str(rng.randrange(30, 250) / 100)),
+        carton_cm=(rng.randrange(20, 61), rng.randrange(20, 51), rng.randrange(15, 41)),
+        marks=f"{rng.choice('ABCDEFGHJKLMN')}{rng.randrange(100, 999)}/{index + 1}",
     )
 
 
@@ -139,18 +145,25 @@ def build_shipment(rng: Random, *, ais_db: str | pathlib.Path | None = None) -> 
             break
     if not chosen:
         raise RuntimeError("no chapter in the seed can supply two distinct line items")
-    items = [_line_item(rng, h) for h in chosen]
+    items = [_line_item(rng, h, i) for i, h in enumerate(chosen)]
 
     invoice_date = date(2026, 1, 1) + timedelta(days=rng.randint(0, 250))
     serial = rng.randint(1000, 9999)
+    # Goods are invoiced before they are loaded. A bill of lading dated
+    # earlier than its invoice is one of the injected discrepancies later,
+    # so it must not happen by accident here.
+    bl_date = invoice_date + timedelta(days=rng.randint(1, 14))
     subtotal = sum((i.amount for i in items), Decimal("0.00"))
 
     return Shipment(
         reference=f"CW-{invoice_date:%Y%m}-{serial}",
         invoice_no=f"INV-{invoice_date:%Y}-{serial}",
         invoice_date=invoice_date,
+        bl_no=f"{rng.choice(('MSCU', 'MAEU', 'CMDU', 'HLCU'))}{rng.randrange(10**8, 10**9)}",
+        bl_date=bl_date,
         seller=_party(rng, parties),
         buyer=_party(rng, parties),
+        notify_party=_party(rng, parties),
         port_of_loading=loading,
         port_of_discharge=discharge,
         vessel=vessel,
@@ -163,5 +176,7 @@ def build_shipment(rng: Random, *, ais_db: str | pathlib.Path | None = None) -> 
         insurance=(subtotal * Decimal(str(rng.randrange(20, 150) / 10000))).quantize(
             Decimal("0.01")
         ),
+        freight_terms=rng.choice(FREIGHT_TERMS),
+        containers=[make_container(rng) for _ in range(rng.randint(1, 3))],
         items=items,
     )

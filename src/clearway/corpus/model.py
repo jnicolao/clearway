@@ -45,10 +45,30 @@ class LineItem:
     unit_price: Decimal
     net_weight_kg: Decimal
     cartons: int
+    tare_per_carton_kg: Decimal
+    carton_cm: tuple[int, int, int]
+    marks: str
 
     @property
     def amount(self) -> Decimal:
         return (self.unit_price * self.quantity).quantize(Decimal("0.01"))
+
+    @property
+    def gross_weight_kg(self) -> Decimal:
+        """Net plus packaging. The bill of lading carries gross, the invoice net."""
+        return (self.net_weight_kg + self.tare_per_carton_kg * self.cartons).quantize(
+            Decimal("0.001")
+        )
+
+    @property
+    def volume_cbm(self) -> Decimal:
+        length, width, height = self.carton_cm
+        per_carton = Decimal(length * width * height) / Decimal(1_000_000)
+        return (per_carton * self.cartons).quantize(Decimal("0.001"))
+
+    @property
+    def dimensions(self) -> str:
+        return "{} x {} x {} cm".format(*self.carton_cm)
 
 
 @dataclass(frozen=True)
@@ -56,8 +76,11 @@ class Shipment:
     reference: str
     invoice_no: str
     invoice_date: date
+    bl_no: str
+    bl_date: date
     seller: Party
     buyer: Party
+    notify_party: Party
     port_of_loading: Port
     port_of_discharge: Port
     vessel: str
@@ -66,6 +89,8 @@ class Shipment:
     currency: str
     freight: Decimal
     insurance: Decimal
+    freight_terms: str
+    containers: list[str] = field(default_factory=list)
     items: list[LineItem] = field(default_factory=list)
 
     @property
@@ -83,3 +108,11 @@ class Shipment:
     @property
     def total_cartons(self) -> int:
         return sum(i.cartons for i in self.items)
+
+    @property
+    def total_gross_weight(self) -> Decimal:
+        return sum((i.gross_weight_kg for i in self.items), Decimal("0.000"))
+
+    @property
+    def total_volume_cbm(self) -> Decimal:
+        return sum((i.volume_cbm for i in self.items), Decimal("0.000"))

@@ -5,10 +5,10 @@ been drawn. That is what lets `skip` omit a field's ink without moving
 anything else — which is what the bounding-box verification depends on.
 """
 
-from decimal import Decimal
-
 from clearway.corpus.canvas import Field, RecordingCanvas
 from clearway.corpus.model import Shipment
+from clearway.corpus.text import money as _money
+from clearway.corpus.text import wrap as _wrap
 
 # A4 at 150 dpi.
 WIDTH, HEIGHT = 1240, 1754
@@ -17,42 +17,6 @@ LEFT, RIGHT = 70, WIDTH - 70
 COLUMNS = {"desc": LEFT, "hts": 640, "qty": 830, "unit_price": 980, "amount": RIGHT}
 ROW_HEIGHT = 56
 DESC_WRAP = 52
-
-
-def _money(value: Decimal) -> str:
-    return f"{value:,.2f}"
-
-
-def _wrap(text: str, width: int, lines: int = 2) -> list[str]:
-    """Wrap to at most `lines`, eliding the middle rather than the tail.
-
-    HTS descriptions are composed from a hierarchy, so items in one chapter
-    share long prefixes and differ only at the end — "…, Other pig fat,
-    Yellow". Truncating the tail would render several line items identically,
-    which makes it ambiguous which extracted row belongs to which item.
-    Eliding the middle keeps the distinguishing part and reads the way real
-    invoices abbreviate.
-    """
-    budget = width * lines
-    if len(text) > budget:
-        head = budget // 2 - 2
-        tail = budget - head - 3
-        text = f"{text[:head].rstrip()}... {text[-tail:].lstrip()}"
-
-    out: list[str] = []
-    current = ""
-    for word in text.split():
-        candidate = f"{current} {word}".strip()
-        if len(candidate) <= width:
-            current = candidate
-        else:
-            out.append(current)
-            current = word
-        if len(out) == lines:
-            break
-    if current and len(out) < lines:
-        out.append(current)
-    return out
 
 
 def render(
