@@ -20,7 +20,7 @@
 #      EnvironmentVariables since there would be no shell to source .env.
 
 set -euo pipefail
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 LABEL="com.jnicolao.clearway.ais"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/clearway-ais.log"

@@ -7,7 +7,7 @@
 # truth for it and keeping it out of ~/Library.
 
 set -euo pipefail
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO"
 
 if [ ! -f .env ]; then
