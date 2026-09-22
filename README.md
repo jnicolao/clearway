@@ -114,6 +114,29 @@ Generated corpora inflate scores when the generator and the extractor share
 assumptions. The mitigation is structural — a synthetic number is never
 published without the ViDoRe and CORD numbers beside it.
 
+## Running the collector
+
+The AIS collector must run continuously for six-plus weeks before the
+dwell-time work in the roadmap can start, so it runs as a launchd agent
+rather than a terminal process:
+
+```bash
+./scripts/install-collector-agent.sh          # install and start
+./scripts/install-collector-agent.sh --uninstall
+tail -f ~/Library/Logs/clearway-ais.log
+```
+
+**This repo lives at `~/Developer/clearway`, not under `~/Documents`.** That
+is deliberate: `~/Documents` is TCC-protected, and a launchd agent is denied
+access to it even though Terminal is allowed, so the agent dies with
+"Operation not permitted" before it runs. A symlink at
+`~/Documents/github/clearway` keeps the old path working for humans; the
+scripts resolve with `pwd -P` so the agent always gets the real path.
+
+Only one collector may write at a time — it takes an exclusive lock beside
+the database. The schema has no uniqueness constraint, so two writers would
+silently duplicate rows and skew every dwell-time figure derived from them.
+
 ## Roadmap
 
 - [x] Port-call collector (AIS) — running, feeds dwell-time forecasting
