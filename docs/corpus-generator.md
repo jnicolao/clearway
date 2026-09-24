@@ -83,8 +83,18 @@ documents involved, and the fields involved.
 | `hs_code_mismatch` | HS code inconsistent with the goods description |
 | `weight_mismatch` | B/L gross weight ≠ packing list total |
 | `date_inconsistency` | B/L date precedes the invoice date |
-| `currency_confusion` | declaration repeats the invoice figure in another currency |
+| `currency_confusion` | *deferred — needs the customs declaration* |
 | `missing_document` | a document required for that trade lane is absent |
+
+Implemented types are tagged `cross_document` or `within_document`, because a
+reconciler needs both capabilities: two papers disagreeing about one fact is
+only findable side by side, while a paper contradicting itself is findable on
+one page and real filings do it constantly.
+
+`currency_confusion` stays unimplemented rather than faked against the
+invoice. It is defined against a customs declaration, which is not one of the
+three documents yet, and a defect retargeted to fit the documents we happen
+to have would be a different defect wearing the same label.
 
 A bundle may carry zero discrepancies. **Clean bundles are not filler** —
 without them the false-positive rate is unmeasurable, and a reconciler that

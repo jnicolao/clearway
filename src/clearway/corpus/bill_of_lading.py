@@ -37,9 +37,12 @@ def _field_box(
 
 
 def render(
-    shipment: Shipment, *, skip: frozenset[str] = frozenset()
+    shipment: Shipment,
+    *,
+    skip: frozenset[str] = frozenset(),
+    overrides: dict[str, str] | None = None,
 ) -> tuple[RecordingCanvas, list[Field]]:
-    c = RecordingCanvas(WIDTH, HEIGHT, skip=skip)
+    c = RecordingCanvas(WIDTH, HEIGHT, skip=skip, overrides=overrides)
 
     c.text("document_title", (LEFT, 60), "BILL OF LADING", size=28)
     c.label((MID + 10, 58), "B/L NUMBER")
