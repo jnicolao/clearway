@@ -9,6 +9,13 @@ laid out exactly as normal but its ink is not drawn, so a caller can render
 the same page twice — once whole, once missing one field — and diff them.
 Layout is computed from the shipment data, never from what has been drawn,
 so omitting a field moves nothing else on the page.
+
+`overrides` is how a discrepancy reaches the page. A named field renders the
+override instead of the shipment's value, and the annotation records what was
+drawn rather than what was true. The Shipment itself is never mutated: it
+stays the canonical record, the document diverges from it, and
+discrepancies.json says exactly where. Putting this on the canvas rather than
+in each template means every document supports injection the moment it exists.
 """
 
 from dataclasses import dataclass
@@ -47,12 +54,14 @@ class RecordingCanvas:
         *,
         background: str = "white",
         skip: frozenset[str] = frozenset(),
+        overrides: dict[str, str] | None = None,
     ) -> None:
         self.image = Image.new("RGB", (width, height), background)
         self.draw = ImageDraw.Draw(self.image)
         self.width = width
         self.height = height
         self.skip = skip
+        self.overrides = overrides or {}
         self.fields: list[Field] = []
 
     # ── recorded content ────────────────────────────────────────────────────
@@ -66,7 +75,12 @@ class RecordingCanvas:
         fill: str = "black",
         anchor: str = "la",
     ) -> Field:
-        """Draw a field and record where it landed."""
+        """Draw a field and record where it landed.
+
+        An override replaces the value before anything is measured, so the
+        recorded bounding box bounds the text actually on the page.
+        """
+        value = self.overrides.get(name, value)
         f = font(size)
         box = self.draw.textbbox(xy, value, font=f, anchor=anchor)
         bbox: BBox = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))

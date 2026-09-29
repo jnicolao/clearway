@@ -20,9 +20,12 @@ DESC_WRAP = 52
 
 
 def render(
-    shipment: Shipment, *, skip: frozenset[str] = frozenset()
+    shipment: Shipment,
+    *,
+    skip: frozenset[str] = frozenset(),
+    overrides: dict[str, str] | None = None,
 ) -> tuple[RecordingCanvas, list[Field]]:
-    c = RecordingCanvas(WIDTH, HEIGHT, skip=skip)
+    c = RecordingCanvas(WIDTH, HEIGHT, skip=skip, overrides=overrides)
 
     # ── header ──────────────────────────────────────────────────────────────
     c.text("document_title", (LEFT, 64), "COMMERCIAL INVOICE", size=30)
