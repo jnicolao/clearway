@@ -1,154 +1,110 @@
 # Clearway
 
-**Multimodal trade-document clearance copilot.** Reads a shipment's document
-bundle as images, extracts every field with a pixel-level citation, reconciles
-fields across documents, and flags what will hold the shipment at customs.
+**A synthetic trade-document corpus with exact ground truth.** Generates
+bundles of commercial invoices, packing lists and bills of lading that all
+describe one shipment, with a measured bounding box for every field, labelled
+disagreements between the documents, and realistic scan damage whose
+annotations follow the pixels.
 
-> **Status: in development.** Nothing in this repo works yet. There are no
-> benchmark numbers published below because none have been measured — see
-> [Evaluation](#evaluation) for why that matters here.
+> **Status: complete, archived 9 November 2026.** This started as the
+> evaluation foundation for a document-reconciliation copilot. The corpus
+> generator and the vessel data collection were finished; the copilot that
+> would have been evaluated against them was not built. Everything in the repo
+> works and is tested — 187 tests, passing in CI.
 
----
+## Why it exists
 
-## The problem
+Customs clearance stalls when a shipment's documents disagree with each other:
+the packing list quantity doesn't match the invoice, or the consignee on the
+bill of lading isn't the invoice buyer. Building something that catches this
+needs an evaluation set where every disagreement is labelled.
 
-Cross-border shipments move on a bundle of documents: bill of lading,
-commercial invoice, packing list, certificate of origin, customs declaration.
-They arrive as scanned PDFs, phone photos, and stamped faxes — multi-language,
-skewed, partly handwritten.
+No such set is public. Real bills of lading and customs declarations are
+commercially sensitive, so annotated scans aren't published. Even if they
+were, cross-document reconciliation couldn't be scored on found documents
+without hand-labelling every discrepancy across every bundle. Injecting the
+discrepancies yourself is the only way to get labels that are both exact and
+free.
 
-Clearance rarely stalls because one document is wrong. It stalls because the
-documents **disagree with each other**: the invoice value doesn't match the
-declaration, the HS code doesn't match the goods description, the consignee on
-the B/L isn't the consignee on the cert. Every day held is demurrage.
-
-Clearway reconciles the bundle and produces a triage packet: a risk score, the
-specific discrepancies, and a cropped image of the evidence behind each claim.
-
-## Approach
-
-Two decisions separate this from a document-parsing wrapper.
-
-**Documents are read as images, not as OCR text.** Retrieval uses
-late-interaction multi-vector matching over page images — via a hosted
-embedding API — so layout, stamps, and table structure survive into the
-model's context instead of being flattened into a text blob first.
-
-**Every assertion is grounded in a pixel region.** Each extracted field carries
-a page and bounding box, and a second model re-verifies the claim against only
-that crop. Ungrounded claims become countable rather than a matter of opinion —
-which is what makes the hallucination rate in the eval table a measurement and
-not a vibe.
-
-## Architecture
+## What a bundle contains
 
 ```
-intake ──▶ classify ──▶ extract ──▶ reconcile ──▶ comply ──▶ forecast ──▶ critic
-             │             │            │            │           │          │
-        doc type &    VLM + bbox   cross-doc     sanctions,   dwell-time  re-verify
-        quality gate   citations   field diff    tariff code   risk       vs. crop
-                                                                             │
-                                              low confidence ──▶ human review
+<seed>-<n>/
+├── shipment.json              the truth, never modified
+├── discrepancies.json         what was injected, where, and of what type
+├── invoice.png / .json        page image + every field's value, box and quad
+├── packing_list.png / .json
+└── bill_of_lading.png / .json
 ```
 
-Human review is a graph interrupt, not a separate app. Corrections flow back
-into the eval set, so the review queue is also the training signal.
+The three documents carry deliberately different views of one shipment.
+Prices appear only on the invoice, and gross weight and a notify party only
+on the bill of lading, so a reconciler can't simply diff every field.
 
-## Evaluation
+## Why the labels can be trusted
 
-The eval harness is the point of this project, not an afterthought to it.
+**Boxes are measured, not inferred.** Each page is drawn field by field with
+Pillow, and a field's box is the rectangle its text was drawn into. A test
+renders every page again without each field, diffs the two images, and
+asserts the changed pixels fall inside that field's box.
 
-| Axis | Metric | Status |
-|---|---|---|
-| Page retrieval vs. OCR-chunk baseline | nDCG@5, Recall@10, MRR | not yet measured |
-| Field extraction | F1 across document types | not yet measured |
-| Groundedness | ungrounded-claim rate | not yet measured |
-| Judge calibration | Cohen's κ vs. human labels | not yet measured |
-| Robustness | F1 degradation across 9 perturbations | not yet measured |
-| Cost | $ per document, p95 latency | not yet measured |
+**Discrepancies never touch the truth.** They are applied as render-time
+overrides, so `shipment.json` stays the canonical record. A separate test
+reads the rendered pages the way a reconciler would, re-derives every
+disagreement independently, and asserts the result matches the recorded labels
+exactly — no unlabelled defects. Seven types are implemented: quantity, party,
+weight, date, value, HS code and missing document. An eighth, defined against
+a customs declaration, was scoped and deliberately left out rather than faked
+against the documents that exist.
 
-Numbers land here when they are measured on a held-out set, and not before.
+**Annotations follow the pixels through damage.** There are nine degradation
+axes, each with a severity in [0, 1]. Rotation, perspective and crop return a
+homography, and every box is mapped through the composed transform; mapped
+boxes measured within 1px of the actual ink. Blur, JPEG, exposure, speckle,
+bilevel and stamps change pixels without moving them. Rotated boxes are kept
+as quadrilaterals, since a rotated box isn't a box.
 
-## Stack
+**Seeded from real public data.** Line items come from 252 USITC HTS tariff
+lines, vessel names from the collector below, and container numbers carry
+valid ISO 6346 check digits. The same seed produces byte-identical output.
 
-**Fully open source, no paid APIs, no GPU required.** Every model runs
-locally and every weight is Apache-2.0. A clone needs Ollama and a laptop.
+More detail on each decision is in [docs/corpus-generator.md](docs/corpus-generator.md).
 
-**Models** — `ColQwen2` (Apache-2.0) for multi-vector page retrieval, giving
-late interaction locally. ColPali is deliberately *not* used: its PaliGemma
-backbone ships under the Gemma licence. `Qwen2.5-VL` via Ollama for
-extraction, small tier by default and the larger one where confidence is low.
-
-**Infrastructure** — Python · LangGraph · Qdrant (multi-vector) · Postgres +
-pgvector · Langfuse · Prefect · Docker Compose. Apache-2.0 or MIT throughout.
-
-**Live APIs** — all free, no key or no card: OpenSanctions (denied-party
-screening), USITC HTS (tariff validation), UN Comtrade (trade flows),
-AISStream (vessel AIS).
-
-**Memory note.** ColQwen2-2B and Qwen2.5-VL-7B do not co-reside comfortably
-in 16GB, so indexing and extraction run as sequential batch phases rather
-than one live pipeline. That is a real constraint on the design, not a
-tuning detail.
-
-## Evaluation corpus
-
-No free, openly-licensed corpus of real scanned trade documents with
-extraction ground truth exists — those documents are commercially sensitive.
-So the corpus is assembled in three layers, and results are always reported
-against the real ones alongside the generated ones:
-
-- **Retrieval** on **ViDoRe**, so the headline number sits next to published
-  ColPali results rather than a private baseline of our own choosing.
-- **Extraction** on **CORD** (CC BY 4.0) and **DocLayNet**
-  (CDLA-Permissive-1.0). DocILE is excluded: research-access only, which a
-  fully-open project cannot redistribute.
-- **Reconciliation** on a generated bundle corpus, seeded from real public
-  data — HS codes from USITC HTS, vessels and ports from this repo's own AIS
-  collector, trade flows from UN Comtrade, entity names from OpenSanctions.
-  Cross-document reconciliation *cannot* be evaluated on a found corpus:
-  measuring whether an invoice disagrees with a declaration needs every
-  discrepancy labelled, which is only free if you inject them yourself.
-
-Generated corpora inflate scores when the generator and the extractor share
-assumptions. The mitigation is structural — a synthetic number is never
-published without the ViDoRe and CORD numbers beside it.
-
-## Running the collector
-
-The AIS collector must run continuously for six-plus weeks before the
-dwell-time work in the roadmap can start, so it runs as a launchd agent
-rather than a terminal process:
+## Usage
 
 ```bash
-./scripts/install-collector-agent.sh          # install and start
-./scripts/install-collector-agent.sh --uninstall
-tail -f ~/Library/Logs/clearway-ais.log
+uv sync
+uv run python -m clearway.corpus.generate --seed 7 --count 100 --out bundles/
+uv run python -m clearway.corpus.generate --seed 7 --count 100 --degrade 3 --severity 0.6 --out scanned/
+uv run pytest
 ```
 
-**This repo lives at `~/Developer/clearway`, not under `~/Documents`.** That
-is deliberate: `~/Documents` is TCC-protected, and a launchd agent is denied
-access to it even though Terminal is allowed, so the agent dies with
-"Operation not permitted" before it runs. A symlink at
-`~/Documents/github/clearway` keeps the old path working for humans; the
-scripts resolve with `pwd -P` so the agent always gets the real path.
+`--discrepancy-rate` (default 0.6) sets the share of bundles that carry
+defects. The rest are clean on purpose: without clean bundles a reconciler's
+false-positive rate can't be measured.
 
-Only one collector may write at a time — it takes an exclusive lock beside
-the database. The schema has no uniqueness constraint, so two writers would
-silently duplicate rows and skew every dwell-time figure derived from them.
+## AIS collector
 
-## Roadmap
+`clearway.ais` recorded vessel position reports from AISStream around
+Mombasa, Dar es Salaam and Durban from 21 September to 9 November 2026 —
+75,489 reports from 367 vessels — running as a launchd agent behind a
+single-writer lock.
 
-- [x] Port-call collector (AIS) — running, feeds dwell-time forecasting
-- [x] Model client layer — local Ollama tiers with throughput accounting
-- [ ] Ingestion pipeline and document corpus
-- [ ] Visual retrieval index, end to end
-- [ ] Eval harness v1 and the retrieval baseline comparison
-- [ ] Grounded extraction with bounding-box citations
-- [ ] LangGraph orchestration and the critic pass
-- [ ] Compliance checks against live APIs
-- [ ] Human-in-the-loop review and tracing
-- [ ] Dwell-time forecasting and the robustness suite
+One finding worth keeping: **every report came from Durban.** Seven weeks of
+continuous collection produced nothing at Mombasa or Dar es Salaam, though
+the bounding boxes were checked against the harbour coordinates. That points
+to a gap in terrestrial AIS receiver coverage on that stretch of coast rather
+than a configuration error. The collected data isn't published here.
+
+## Not pursued
+
+The copilot this corpus was built to evaluate was planned but not built:
+visual page retrieval with ColQwen2, grounded field extraction, orchestration
+with a critic pass, compliance checks against OpenSanctions and USITC HTS,
+human review, and a dwell-time forecast from the AIS data. `clearway.models`
+holds thin clients for local Ollama and ColQwen2, tested against injected
+transports but never run against a model. The plan for each stage is in the
+closed issues.
 
 ## License
 
