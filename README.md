@@ -87,7 +87,7 @@ false-positive rate can't be measured.
 
 `clearway.ais` recorded vessel position reports from AISStream around
 Mombasa, Dar es Salaam and Durban from 21 September to 9 November 2026 —
-75,489 reports from 367 vessels — running as a launchd agent behind a
+75,545 reports from 367 vessels — running as a launchd agent behind a
 single-writer lock.
 
 One finding worth keeping: **every report came from Durban.** Seven weeks of
