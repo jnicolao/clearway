@@ -1,0 +1,19 @@
+{
+  "note": "Synthetic company names. Real sanctioned entities are injected separately for the compliance eval and never appear here.",
+  "prefixes": ["Kilindini", "Rift Valley", "Sable", "Northgate", "Tamarind", "Meridian", "Halcyon", "Ironwood", "Blue Nile", "Serengeti", "Cardamom", "Westbrook", "Anvil", "Kestrel", "Longhorn", "Palmyra"],
+  "middles": ["Trading", "Exports", "Logistics", "Commodities", "Industries", "Supply", "Freight", "Produce", "Mercantile", "Imports"],
+  "suffixes": ["Ltd", "Limited", "PLC", "Co.", "SARL", "GmbH", "B.V.", "Pty Ltd"],
+  "streets": ["Moi Avenue", "Kenyatta Road", "Nyerere Road", "Harbour Way", "Industrial Area", "Dock Street", "Mombasa Road", "Bagamoyo Road", "Point Road", "Enterprise Road"],
+  "cities": [
+    {"city": "Mombasa", "country": "Kenya"},
+    {"city": "Nairobi", "country": "Kenya"},
+    {"city": "Dar es Salaam", "country": "Tanzania"},
+    {"city": "Durban", "country": "South Africa"},
+    {"city": "Rotterdam", "country": "Netherlands"},
+    {"city": "Hamburg", "country": "Germany"},
+    {"city": "Dubai", "country": "United Arab Emirates"},
+    {"city": "Shanghai", "country": "China"},
+    {"city": "Mumbai", "country": "India"},
+    {"city": "Singapore", "country": "Singapore"}
+  ]
+}
